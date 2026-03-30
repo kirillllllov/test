@@ -1,0 +1,566 @@
+openapi: 3.0.0
+info:
+  title: A bot for collecting feedback and monitoring service levels API
+  version: 0.0.1
+servers:
+  - url: http://localhost:8000/api/v1/
+    description: Dev server
+paths:
+  /keyboard/create:
+    post:
+      summary: Метод отправки клавиатуры
+      tags:
+        - API's модуля (Модуль вызывает api коннектора)
+      operationId: sendKeyboard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KeyboardRequest"
+      responses:
+        '200':
+          description: Успешный ответ с отправленной клавиатурой
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/KeyboardResponse"
+        'default':
+          description: Все нестандартное
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/Error"
+  /keyboard/update:
+    post:
+      summary: Метод обновления клавиатуры
+      tags:
+        - API's модуля (Модуль вызывает api коннектора)
+      operationId: updateKeyboard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KeyboardRequestUpdate"
+      responses:
+        '200':
+          description: Успешный ответ обновления клавиатуры
+        'default':
+          description: Все нестандартное
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/Error"
+  /message:
+    post:
+      summary: Метод отправки сообщения
+      tags:
+        - API's модуля (Модуль вызывает api коннектора)
+      operationId: sendMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Message"
+      responses:
+        '200':
+          description: Успешный ответ с отправленной кнопкой клавиатуры
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/SendPlaceInfoRequestWithMessage"
+        'default':
+          description: Все нестандартное
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/Error"
+  /keyboard/input:
+    post:
+      summary: Метод отправки выбранной кнопки
+      tags:
+        - API's коннектора (Коннектор вызывает api модуля)
+      operationId: enterKeyboard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnterKeyboard"
+      responses:
+        '200':
+          description: Успешный ответ с отправленной кнопкой клавиатуры
+        'default':
+          description: Все нестандартное
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/Error"
+  /image:
+    post:
+      summary: Метод отправки изображений
+      tags:
+        - API's коннектора (Коннектор вызывает api модуля)
+      operationId: sendImages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Image"
+      responses:
+        '200':
+          description: Успешный ответ с urls изображений
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/ImageURL"
+        'default':
+          description: Все нестандартное
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/Error"
+  /command:
+    post:
+      summary: Метод отправки команды
+      tags:
+        - API's коннектора (Коннектор вызывает api модуля)
+      operationId: sendCommand
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Command"
+      responses:
+        '200':
+          description: Успешный ответ отправленной команды
+        'default':
+          description: Все нестандартное
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/Error"
+  /user_message:
+    post:
+      summary: Метод отправки сообщения от пользователя
+      tags:
+        - API's коннектора (Коннектор вызывает api модуля)
+      operationId: sendMessageFromModule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Message"
+      responses:
+        '200':
+          description: Успешный ответ отправленного сообщения
+        'default':
+          description: Все нестандартное
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/Error"  
+  /message/action:
+    post:
+      summary: Метод отправки действия над сообщением
+      tags:
+        - API's коннектора (Коннектор вызывает api модуля)
+      operationId: sendActionOnMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionOnMessage"
+      responses:
+        '200':
+          description: Успешный ответ отправки действия над сообщением
+        'default':
+          description: Все нестандартное
+          content:
+            application/json:
+              schema: 
+                $ref: "#/components/schemas/Error"
+
+
+  /appeal-agent:
+    post:
+      tags: 
+        - API's модуля агента
+      summary: Отправить обращение агенту
+      operationId: startAppealProcessing
+      description: Запускает выполнение workflow. Возвращает ID выполнения, по которому позже можно получить результат.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRequest'
+      responses:
+        '200':
+          description: Workflow выполнен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionResponse'
+
+    get:
+      tags: 
+        - API's модуля агента
+      summary: Получить результат обработки обращения
+      operationId: getAppealResult
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: executionId
+          in: query
+          required: true
+          schema:
+            type: string
+          example: dfq0jc2purufolepkm26-864c04cf-19c6-4b7b-8a0c-da1b846af955
+      responses:
+        '200':
+          description: Результат обработки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentResult'                   
+    
+            
+            
+components:
+  schemas:
+    KeyboardRequest:
+      type: object
+      required:
+        - user_id
+        - title
+        - buttons
+        - place_info
+      properties:
+        user_id:
+          type: string
+          example: 123
+        place:
+          $ref: "#/components/schemas/SendPlaceInfoRequest"
+        title:
+          type: string
+          example: "Выбор подразделения"
+        buttons:
+          type: array
+          items: 
+            $ref: "#/components/schemas/Button"
+          example: 
+            - text: "СТО Димитровский мост"
+            - text: "СТО ДОК"
+    KeyboardResponse:
+      type: object
+      required:
+        - user_id
+        - place
+        - date_time
+      properties:
+        user_id:
+          type: string
+          example: 123
+        place:
+          $ref: "#/components/schemas/SendPlaceInfoResponse"
+        date_time:
+              type: string
+              format: date-time
+              example: "2025-01-29T15:00:00+01:00"
+        
+    KeyboardRequestUpdate:
+      type: object
+      required:
+        - user_id
+        - title
+        - buttons
+        - place
+      properties:
+        user_id:
+          type: string
+          example: 123
+        place:
+          $ref: "#/components/schemas/SendPlaceInfoRequestWithMessage"
+        title:
+          type: string
+          example: "Выбор подразделения"
+        buttons:
+          type: array
+          items: 
+            $ref: "#/components/schemas/Button"
+          example: 
+            - text: "СТО Димитровский мост"
+            - text: "СТО ДОК"
+        
+    Button:
+      type: object
+      required: 
+        - text
+      properties:
+        text:
+          type: string
+    EnterButtonKeyboard:
+      type: object
+      properties:
+        send_place_info:
+          $ref: "#/components/schemas/SendPlaceInfoResponse"
+        button:
+          $ref: "#/components/schemas/Button"
+    SendPlaceInfoRequest:
+      type: object
+      required: 
+        - chat_id
+      properties:
+        chat_id:
+          type: string
+          example: 123
+
+    SendPlaceInfoRequestWithMessage:
+      type: object
+      required: 
+        - user_id
+        - date_time
+        - place
+      properties:
+        user_id:
+            type: string
+            example: 123
+        place:
+          $ref: "#/components/schemas/SendPlaceInfoResponse"
+        date_time:
+            type: string
+            format: date-time
+            example: "2025-01-29T15:00:00+01:00"
+
+    SendPlaceInfoResponse:
+      type: object
+      required: 
+        - chat_id
+        - message_id
+      properties:
+        chat_id:
+          type: string
+          example: 123
+        message_id:
+          type: string
+          example: 123
+    Message:
+      type: object
+      required: 
+        - user_id
+        - place
+        - text
+        - date_time
+      properties:
+        user_id:
+          type: string
+          example: 123
+        place:
+          $ref: "#/components/schemas/SendPlaceInfoRequest"
+        text:
+          type: string
+        date_time:
+            type: string
+            format: date-time
+            example: "2025-01-29T15:00:00+01:00"
+        
+    EnterKeyboard:
+      type: object
+      required:
+        - user_id
+        - button
+        - place
+        - date_time
+      properties:
+        user_id:
+          type: string
+          example: 123
+        button:
+          type: string
+          example: "СТО Димитровский мост"
+        place:
+          $ref: "#/components/schemas/SendPlaceInfoResponse"
+        date_time:
+            type: string
+            format: date-time
+            example: "2025-01-29T15:00:00+01:00"
+    Image:
+      type: object
+      required: 
+        - attachments_base64
+      properties:
+        user_id:
+          type: string
+          example: 123
+        place:
+          $ref: "#/components/schemas/SendPlaceInfoRequest"
+        attachments_base64:
+          type: array
+          items:
+            type: string
+            format: byte
+            description: Массив изображений в Base64
+        date_time:
+            type: string
+            format: date-time
+            example: "2025-01-29T15:00:00+01:00"
+    ImageURL:
+      type: object
+      properties:
+        attachment_urls:
+          type: array
+          items:
+            type: string
+            format: uri
+            example: "https://storage.example.com/images/1.jpg"
+    Command:
+      type: object
+      required: 
+        - user_id
+        - place
+        - name
+        - date_time
+      properties:
+        user_id:
+          type: string
+          example: 123
+        place:
+          $ref: "#/components/schemas/SendPlaceInfoRequest"
+        name:
+          type: string
+          example: start
+          description: Текст команды
+        date_time:
+          type: string
+          format: date-time
+          example: "2025-01-29T15:00:00+01:00"
+
+    ActionOnMessage:
+      type: object
+      required: 
+        - user_id
+        - place
+        - action
+        - date_time
+      properties:
+        user_id:
+          type: string
+          example: 123
+        place:
+          $ref: "#/components/schemas/SendPlaceInfoRequest"
+        action:
+          type: string
+          example: read
+        date_time:
+          type: string
+          format: date-time
+          example: "2025-01-29T15:00:00+01:00"
+
+
+      
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+
+    ExecutionResponse:
+      type: object
+      properties:
+        executionId:
+          type: string
+          example: "dfq0jc2purufolepkm26-864c04cf-19c6-4b7b-8a0c-da1b846af955"
+    
+    AgentRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: "У меня проблема с ККМ"
+        
+        escalate:
+          type: boolean
+          example: false
+        
+        category:
+          type: string
+          example: "ТехПоддержка"
+        
+        software:
+          type: string
+          example: "ККМ"
+        
+        criticality:
+          type: string
+          example: "проблема"
+        
+        image:
+          type: array
+          items:
+            type: string
+          example: ["https://storage.example.com/screen.png"]
+        
+        context:
+          type: array
+          items:
+            $ref: '#/components/schemas/DialogMessage'
+
+    DialogMessage:
+      type: object
+      required:
+        - user_id
+        - content
+
+      properties:
+        user_id:
+          type: string
+          example: "usr_123"
+        
+        content:
+          type: string
+          example: "ККМ не печатает чеки"
+
+    AgentResult:
+      type: object
+      properties:
+        execution:
+          type: object
+          properties:
+            id:
+              type: string
+            workflowId:
+              type: string
+            status:
+              type: string
+              example: "FINISHED"
+            startedAt:
+              type: string
+              format: date-time
+              example: "2026-02-26T23:31:47.641443752Z"
+            duration:
+              type: string
+              example: "2.695087695s"
+        input:
+          $ref: '#/components/schemas/AgentRequest'
+        result:
+          type: object
+          properties:
+            raw_output:
+              type: object
+              example: "{\"output\":{\"Result\":\"Описание проблемы:\\nККМ не печатает чеки\\n\\nКлассификация:\\nКатегория: ТехПоддержка\\nПО: ККМ\\nКритичность: проблема\\nЭскалация: true\"}}"
