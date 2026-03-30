@@ -1,0 +1,13 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "ESLint: Lint All Files",
+            "type": "shell",
+            "command": "yarn eslint .",
+            "problemMatcher": [
+                "$eslint-stylish"
+            ]
+        }
+    ]
+}

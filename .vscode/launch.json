@@ -1,0 +1,33 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Express App",
+            "type": "node",
+            "request": "launch",
+            "runtimeExecutable": "nodemon",
+            "runtimeArgs": [
+                "--exec",
+                "tsx --inspect",
+                "--watch",
+                "src",
+                "--ext",
+                "ts,json",
+                "--delay",
+                "500ms"
+            ],
+            "args": [
+                "${workspaceFolder}/src/index.ts"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "restart": true,
+            "autoAttachChildProcesses": true,
+            "skipFiles": [
+                "<node_internals>/**",
+                "${workspaceFolder}/node_modules/**"
+            ],
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
