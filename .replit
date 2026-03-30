@@ -1,0 +1,53 @@
+modules = ["nodejs-20"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.development]
+PORT = "5000"
+NODE_ENV = "development"
+DYNAMODB_TABLE = "support-bot-table"
+DYNAMODB_ENDPOINT = "http://localhost:8000"
+DYNAMODB_REGION = "us-east-1"
+AWS_ACCESS_KEY_ID = "fake"
+AWS_SECRET_ACCESS_KEY = "fake"
+MINIO_ENDPOINT = "localhost:9000"
+MINIO_REGION = "us-east-1"
+MINIO_BUCKET = "support-bot-files"
+BOT_BASE_URL = "0.0.0.0"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "yarn dev"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[deployment]
+deploymentTarget = "vm"
+run = ["yarn", "dev"]

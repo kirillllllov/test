@@ -11,8 +11,8 @@ if (environment == 'development') {
     dotenv.config();
 }
 
-const serverPort: number = Number(process.env.PORT) || 3007;
-const serverUrl: string = process.env.BOT_BASE_URL || 'localhost';
+const serverPort: number = Number(process.env.PORT) || 5000;
+const serverUrl: string = process.env.BOT_BASE_URL || '0.0.0.0';
 
 const app = express();
 
