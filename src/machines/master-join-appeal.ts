@@ -1,44 +1,42 @@
 import { createMachine } from 'xstate';
 
-/**
- * Контекст мастера присоединения к обращению
- */
 export interface AppealJoinContext {
-    userId: string | undefined;
+    userId: string;
     appealId: string | undefined;
+    connectorName: string;
+    chatId: string;
 }
 
-/**
- * Возможные события
- */
 export type AppealJoinEvent =
     | { type: 'CONFIRM' }
     | { type: 'CANCEL_JOIN' }
     | { type: 'QUIT_FROM_MASTER' }
     | { type: 'HELP' };
 
-/**
- * Машина состояний для мастера присоединения к обращению.
- * Оптимизированный вариант без состояния getAppealCard.
- */
 export const appealJoinMachine = createMachine(
     {
         id: 'appealMenu',
-        /** Машина сразу начинается с шага подтверждения */
         initial: 'confirmJoin',
 
         types: {} as {
             context: AppealJoinContext;
             events: AppealJoinEvent;
+            input: {
+                userId: string;
+                appealId: string | undefined;
+                connectorName: string;
+                chatId: string;
+            };
         },
 
-        context: {
-            userId: undefined,
-            appealId: undefined,
-        },
+        context: ({ input }) => ({
+            userId: input?.userId ?? '',
+            appealId: input?.appealId,
+            connectorName: input?.connectorName ?? '',
+            chatId: input?.chatId ?? '',
+        }),
 
         states: {
-            /** 1️⃣ Подтверждение присоединения */
             confirmJoin: {
                 entry: 'askJoinConfirmation',
                 on: {
@@ -48,46 +46,94 @@ export const appealJoinMachine = createMachine(
                 },
             },
 
-            /** 2️⃣ Регистрация пользователя */
             registerJoin: {
                 entry: 'registerUserToAppeal',
                 type: 'final',
             },
 
-            /** 3️⃣ Отмена процесса */
             cancelJoinProcess: {
-                entry: 'backToListAppeals',
+                entry: 'notifyJoinCancelled',
                 type: 'final',
             },
         },
     },
     {
         actions: {
-            /** Запрос подтверждения */
-            askJoinConfirmation: () => {
-                console.log('❓ Подтвердите присоединение к обращению.');
-                console.log('→ Кнопки: [Да], [Нет]');
+            askJoinConfirmation: ({ context }) => {
+                const { connectorName, userId, chatId, appealId } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendKeyboard(
+                            connectorName,
+                            userId,
+                            chatId,
+                            `❓ Вы хотите присоединиться к обращению ${appealId ?? ''}?`,
+                            [{ text: 'Да, присоединиться' }, { text: 'Нет, назад' }],
+                        );
+                    } catch (err) {
+                        console.error('[askJoinConfirmation] Ошибка:', err);
+                    }
+                })();
             },
 
-            /** Регистрация пользователя в обращении */
             registerUserToAppeal: ({ context }) => {
-                console.log('✅ Пользователь присоединён к обращению.');
-                console.log(
-                    `→ userId: ${context.userId}, appealId: ${context.appealId}`,
-                );
-                // Здесь в реальном приложении: addUserToAppeal(ctx.userId, ctx.appealId)
+                const { connectorName, userId, chatId, appealId } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendText(
+                            connectorName,
+                            userId,
+                            chatId,
+                            `✅ Вы присоединились к обращению ${appealId ?? ''}. Вы будете получать уведомления о его статусе.`,
+                        );
+                    } catch (err) {
+                        console.error('[registerUserToAppeal] Ошибка:', err);
+                    }
+                })();
             },
 
-            /** Возврат к списку обращений после отмены */
-            backToListAppeals: () => {
-                console.log(
-                    '↩️ Присоединение отменено. Возврат к списку обращений...',
-                );
+            notifyJoinCancelled: ({ context }) => {
+                const { connectorName, userId, chatId } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendText(
+                            connectorName,
+                            userId,
+                            chatId,
+                            '↩️ Присоединение отменено. Возврат к списку обращений.',
+                        );
+                    } catch (err) {
+                        console.error('[notifyJoinCancelled] Ошибка:', err);
+                    }
+                })();
             },
 
-            /** Показать справку */
-            showHelp: () => {
-                console.log('Список доступных вам команд: ');
+            showHelp: ({ context }) => {
+                const { connectorName, userId, chatId } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendText(
+                            connectorName,
+                            userId,
+                            chatId,
+                            '❓ Доступные кнопки: "Да, присоединиться" / "Нет, назад"',
+                        );
+                    } catch (err) {
+                        console.error('[showHelp] Ошибка:', err);
+                    }
+                })();
             },
         },
     },

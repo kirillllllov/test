@@ -3,17 +3,14 @@ import { assign, createMachine, forwardTo } from 'xstate';
 import { appealCreateMachine } from './master-create-appeal.js';
 import { appealJoinMachine } from './master-join-appeal.js';
 
-/**
- * Контекст корневой машины
- */
 export interface AppealRootContext {
-    userId: string | undefined;
-    appealId?: string | undefined;
+    userId: string;
+    connectorName: string;
+    chatId: string;
+    keyboardMessageId: string | undefined;
+    appealId: string | undefined;
 }
 
-/**
- * События для корневой машины
- */
 export type AppealRootEvent =
     | { type: 'START' }
     | { type: 'OPEN_LIST' }
@@ -23,7 +20,6 @@ export type AppealRootEvent =
     | { type: 'BACK' }
     | { type: 'CREATION_RESULT'; result: 'created' | 'cancelled' }
     | { type: 'HELP' }
-    // События для пересылки в дочернюю машину создания обращения
     | { type: 'ADD_DESCRIPTION'; description?: string }
     | { type: 'SELECT_CATEGORY'; category?: string }
     | { type: 'CHOOSE_SOFTWARE'; software?: string }
@@ -36,9 +32,6 @@ export type AppealRootEvent =
     | { type: 'CANCEL_FIXATION' }
     | { type: 'TEXT_INPUT'; text: string };
 
-/**
- * Корневая машина, объединяющая создание и присоединение к обращениям
- */
 export const appealRootMachine = createMachine(
     {
         id: 'appealRoot',
@@ -47,16 +40,18 @@ export const appealRootMachine = createMachine(
         types: {} as {
             context: AppealRootContext;
             events: AppealRootEvent;
-            input: { userId: string } | undefined;
+            input: { userId: string; connectorName: string; chatId: string };
         },
 
         context: ({ input }) => ({
-            userId: input?.userId || undefined,
+            userId: input?.userId ?? '',
+            connectorName: input?.connectorName ?? '',
+            chatId: input?.chatId ?? '',
+            keyboardMessageId: undefined,
             appealId: undefined,
         }),
 
         states: {
-            /** 👋 Приветствие */
             welcome: {
                 entry: 'showWelcome',
                 on: {
@@ -66,7 +61,6 @@ export const appealRootMachine = createMachine(
                 },
             },
 
-            /** 📋 Список обращений */
             listAppeals: {
                 entry: 'showAppealList',
                 on: {
@@ -85,7 +79,6 @@ export const appealRootMachine = createMachine(
                 },
             },
 
-            /** 📄 Просмотр конкретного обращения */
             specificAppeal: {
                 entry: 'showAppealCard',
                 on: {
@@ -95,7 +88,6 @@ export const appealRootMachine = createMachine(
                 },
             },
 
-            /** 🤝 Мастер присоединения (вложенная машина) */
             joinMaster: {
                 invoke: {
                     id: 'appealMenuMachine',
@@ -103,6 +95,8 @@ export const appealRootMachine = createMachine(
                     input: ({ context }) => ({
                         userId: context.userId,
                         appealId: context.appealId,
+                        connectorName: context.connectorName,
+                        chatId: context.chatId,
                     }),
                     onDone: { target: 'listAppeals' },
                 },
@@ -111,13 +105,14 @@ export const appealRootMachine = createMachine(
                 },
             },
 
-            /** 🆕 Мастер создания обращения (вложенная машина) */
             createAppeal: {
                 invoke: {
                     id: 'appealCreateMachine',
                     src: appealCreateMachine,
                     input: ({ context }) => ({
                         userId: context.userId,
+                        connectorName: context.connectorName,
+                        chatId: context.chatId,
                     }),
                     onDone: [
                         {
@@ -135,7 +130,6 @@ export const appealRootMachine = createMachine(
                     ],
                 },
                 on: {
-                    /** Пересылаем все события дочерней машине */
                     ADD_DESCRIPTION: {
                         actions: forwardTo('appealCreateMachine'),
                     },
@@ -166,7 +160,6 @@ export const appealRootMachine = createMachine(
                     },
                     BACK: { actions: forwardTo('appealCreateMachine') },
                     TEXT_INPUT: { actions: forwardTo('appealCreateMachine') },
-                    /** Дополнительный fallback — если событие придёт напрямую */
                     CREATION_RESULT: [
                         {
                             guard: ({ event }) =>
@@ -190,68 +183,150 @@ export const appealRootMachine = createMachine(
     },
     {
         actions: {
-            /** Приветствие */
-            showWelcome: () => {
-                console.log('👋 Добро пожаловать в систему обращений!');
-                console.log('→ [OPEN_LIST] — перейти к списку обращений');
-                console.log('→ [OPEN_CREATE] — создать новое обращение');
+            showWelcome: ({ context }) => {
+                const { connectorName, userId, chatId } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendKeyboard(
+                            connectorName,
+                            userId,
+                            chatId,
+                            '👋 Добро пожаловать в систему обращений! Выберите действие:',
+                            [
+                                { text: 'Мои обращения' },
+                                { text: 'Создать обращение' },
+                                { text: 'Помощь' },
+                            ],
+                        );
+                    } catch (err) {
+                        console.error('[showWelcome] Ошибка отправки:', err);
+                    }
+                })();
             },
 
-            /** Показ списка обращений */
             showAppealList: ({ context }) => {
-                // Try to fetch the list of appeals from the service and print it.
-                // We intentionally don't await here so this action stays synchronous for XState entry,
-                // but we log the result when it arrives.
-                import('../services/appeal-service.js')
-                    .then(({ listRequestsForUser }) => {
-                        return listRequestsForUser(context.userId ?? undefined);
-                    })
-                    .then(text => {
-                        console.log('📋 Список обращений:');
-                        console.log(text);
-                        console.log('→ [SELECT_APPEAL id] — открыть обращение');
-                        console.log(
-                            '→ [OPEN_CREATE] — создать новое обращление',
+                const { connectorName, userId, chatId } = context;
+                (async () => {
+                    try {
+                        const [{ listRequestsForUser }, { default: messagingService }] =
+                            await Promise.all([
+                                import('../services/appeal-service.js'),
+                                import('../services/messaging-service.js'),
+                            ]);
+
+                        const list = await listRequestsForUser(userId);
+                        const text =
+                            list +
+                            '\n\n🔹 Нажмите на ID обращения или выберите действие:';
+
+                        await messagingService.sendKeyboard(
+                            connectorName,
+                            userId,
+                            chatId,
+                            '📋 Список обращений',
+                            [
+                                { text: 'Создать обращение' },
+                                { text: 'Назад' },
+                            ],
                         );
-                        console.log('→ [BACK] — назад');
-                    })
-                    .catch(error => {
-                        console.error(
-                            'Не удалось получить список обращений:',
-                            error,
+                        await messagingService.sendText(
+                            connectorName,
+                            userId,
+                            chatId,
+                            text,
                         );
-                        console.log('📋 Список обращений:');
-                        console.log(
-                            'Ошибка при загрузке списка. Попробуйте позже.',
-                        );
-                    });
+                    } catch (err) {
+                        console.error('[showAppealList] Ошибка:', err);
+                    }
+                })();
             },
 
-            /** Просмотр карточки обращения */
             showAppealCard: ({ context }) => {
-                console.log('📄 Карточка обращения:');
-                console.log(`→ ID: ${context.appealId}`);
-                console.log('→ [JOIN_APPEAL] — присоединиться');
-                console.log('→ [BACK] — назад');
+                const { connectorName, userId, chatId, appealId } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendKeyboard(
+                            connectorName,
+                            userId,
+                            chatId,
+                            `📄 Обращение: ${appealId ?? '—'}`,
+                            [
+                                { text: 'Присоединиться' },
+                                { text: 'Назад' },
+                            ],
+                        );
+                    } catch (err) {
+                        console.error('[showAppealCard] Ошибка:', err);
+                    }
+                })();
             },
 
-            /** Обработка успешного создания */
-            handleAppealCreated: () => {
-                console.log(
-                    '✅ Обращение успешно создано! Возврат к списку обращений.',
-                );
+            handleAppealCreated: ({ context }) => {
+                const { connectorName, userId, chatId } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendText(
+                            connectorName,
+                            userId,
+                            chatId,
+                            '✅ Обращение успешно создано! Возврат к списку.',
+                        );
+                    } catch (err) {
+                        console.error('[handleAppealCreated] Ошибка:', err);
+                    }
+                })();
             },
 
-            /** Обработка отмены создания */
-            handleAppealCancelled: () => {
-                console.log(
-                    '↩️ Создание обращения отменено. Возврат в приветствие.',
-                );
+            handleAppealCancelled: ({ context }) => {
+                const { connectorName, userId, chatId } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendText(
+                            connectorName,
+                            userId,
+                            chatId,
+                            '↩️ Создание обращения отменено.',
+                        );
+                    } catch (err) {
+                        console.error('[handleAppealCancelled] Ошибка:', err);
+                    }
+                })();
             },
 
-            /** Показать справку */
-            showHelp: () => {
-                console.log('Список доступных вам команд: ');
+            showHelp: ({ context }) => {
+                const { connectorName, userId, chatId } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendKeyboard(
+                            connectorName,
+                            userId,
+                            chatId,
+                            '❓ Помощь — доступные команды:',
+                            [
+                                { text: 'Мои обращения' },
+                                { text: 'Создать обращение' },
+                                { text: 'Назад' },
+                            ],
+                        );
+                    } catch (err) {
+                        console.error('[showHelp] Ошибка:', err);
+                    }
+                })();
             },
         },
     },

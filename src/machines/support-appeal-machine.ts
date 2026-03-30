@@ -1,18 +1,18 @@
 import { assign, createMachine } from 'xstate';
 
-/**
- * Контекст машины обращения в поддержке
- */
 export interface SupportAppealContext {
     appealId: string;
-    accepterEmployeeId: string | undefined; // ID принявшего сотрудника (Accepter_employee)
+    staffUserId: string;
+    staffConnectorName: string;
+    staffChatId: string;
+    userUserId: string;
+    userConnectorName: string;
+    userChatId: string;
+    accepterEmployeeId: string | undefined;
     accepterEmployeeName: string | undefined;
     solutionText: string | undefined;
 }
 
-/**
- * События машины обращения
- */
 export type SupportAppealEvent =
     | { type: 'TAKE_WORK'; userId: string; userName: string }
     | { type: 'SOLVE' }
@@ -22,17 +22,6 @@ export type SupportAppealEvent =
     | { type: 'CANCEL' }
     | { type: 'AUTO_REMIND' };
 
-/**
- * Машина состояний для управления жизненным циклом обращения в чате техподдержки.
- *
- * Статусы:
- * - Created: Новое обращение, ожидает распределения.
- * - In_progress: В работе у конкретного сотрудника.
- * - Closed: Обращение закрыто, решение зафиксировано.
- *
- * Внутренние состояния:
- * - Solving: Сотрудник пишет текст решения.
- */
 export const supportAppealMachine = createMachine(
     {
         id: 'supportAppeal',
@@ -41,23 +30,33 @@ export const supportAppealMachine = createMachine(
         types: {} as {
             context: SupportAppealContext;
             events: SupportAppealEvent;
-            input: { appealId: string };
+            input: {
+                appealId: string;
+                staffUserId: string;
+                staffConnectorName: string;
+                staffChatId: string;
+                userUserId: string;
+                userConnectorName: string;
+                userChatId: string;
+            };
         },
 
         context: ({ input }) => ({
-            appealId: input?.appealId || '',
+            appealId: input?.appealId ?? '',
+            staffUserId: input?.staffUserId ?? '',
+            staffConnectorName: input?.staffConnectorName ?? '',
+            staffChatId: input?.staffChatId ?? '',
+            userUserId: input?.userUserId ?? '',
+            userConnectorName: input?.userConnectorName ?? '',
+            userChatId: input?.userChatId ?? '',
             accepterEmployeeId: undefined,
             accepterEmployeeName: undefined,
             solutionText: undefined,
         }),
 
         states: {
-            /**
-             * 1. Created (Новый)
-             * Обращение создано и ожидает, пока кто-то из поддержки возьмет его в работу.
-             */
             Created: {
-                entry: 'logCreated',
+                entry: 'notifyCreated',
                 on: {
                     TAKE_WORK: {
                         target: 'In_progress',
@@ -69,16 +68,10 @@ export const supportAppealMachine = createMachine(
                 },
             },
 
-            /**
-             * 2. In_progress (В работе)
-             * Обращение закреплено за сотрудником.
-             */
             In_progress: {
-                entry: 'logInProgress',
+                entry: 'notifyInProgress',
                 on: {
-                    SOLVE: {
-                        target: 'Solving',
-                    },
+                    SOLVE: { target: 'Solving' },
                     REASSIGN: {
                         actions: ['reassignEmployee', 'notifyReassigned'],
                     },
@@ -89,11 +82,6 @@ export const supportAppealMachine = createMachine(
                 },
             },
 
-            /**
-             * 3. Solving (Написание решения)
-             * Внутреннее состояние, когда сотрудник вводит текст решения.
-             * В БД статус остается In_progress.
-             */
             Solving: {
                 entry: 'promptSolution',
                 on: {
@@ -108,49 +96,26 @@ export const supportAppealMachine = createMachine(
                 },
             },
 
-            /**
-             * 4. Closed (Закрыт)
-             * Финальное состояние.
-             */
             Closed: {
                 type: 'final',
-                entry: 'logClosed',
+                entry: 'notifyClosed',
             },
         },
     },
     {
         actions: {
-            // Логирование входов в состояния
-            logCreated: ({ context }) =>
-                console.log(`[Обращение ${context.appealId}] Статус: Создано`),
-            logInProgress: ({ context }) =>
-                console.log(
-                    `[Обращение ${context.appealId}] Статус: В работе (Исполнитель: ${context.accepterEmployeeName})`,
-                ),
-            logClosed: ({ context }) =>
-                console.log(`[Обращение ${context.appealId}] Статус: Закрыто`),
-
-            // Действия с контекстом
             assignEmployee: assign({
-                accepterEmployeeId: ({ event }) => {
-                    if (event.type === 'TAKE_WORK') return event.userId;
-                    return;
-                },
-                accepterEmployeeName: ({ event }) => {
-                    if (event.type === 'TAKE_WORK') return event.userName;
-                    return;
-                },
+                accepterEmployeeId: ({ event }) =>
+                    event.type === 'TAKE_WORK' ? event.userId : undefined,
+                accepterEmployeeName: ({ event }) =>
+                    event.type === 'TAKE_WORK' ? event.userName : undefined,
             }),
 
             reassignEmployee: assign({
-                accepterEmployeeId: ({ event }) => {
-                    if (event.type === 'REASSIGN') return event.newUserId;
-                    return;
-                },
-                accepterEmployeeName: ({ event }) => {
-                    if (event.type === 'REASSIGN') return event.newUserName;
-                    return;
-                },
+                accepterEmployeeId: ({ event }) =>
+                    event.type === 'REASSIGN' ? event.newUserId : undefined,
+                accepterEmployeeName: ({ event }) =>
+                    event.type === 'REASSIGN' ? event.newUserName : undefined,
             }),
 
             releaseEmployee: assign({
@@ -159,50 +124,222 @@ export const supportAppealMachine = createMachine(
             }),
 
             saveSolution: assign({
-                solutionText: ({ event }) => {
-                    if (event.type === 'SUBMIT_SOLUTION') return event.text;
-                    return;
-                },
+                solutionText: ({ event }) =>
+                    event.type === 'SUBMIT_SOLUTION' ? event.text : undefined,
             }),
 
-            // Сайд-эффекты (заглушки для интеграции с Telegram API)
+            notifyCreated: ({ context }) => {
+                const { staffConnectorName, staffUserId, staffChatId, appealId } =
+                    context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendKeyboard(
+                            staffConnectorName,
+                            staffUserId,
+                            staffChatId,
+                            `📥 Новое обращение #${appealId} ожидает распределения`,
+                            [{ text: `Взять в работу` }, { text: 'Напомнить позже' }],
+                        );
+                    } catch (err) {
+                        console.error('[support:notifyCreated] Ошибка:', err);
+                    }
+                })();
+            },
+
+            notifyInProgress: ({ context }) => {
+                const { staffConnectorName, staffUserId, staffChatId, appealId, accepterEmployeeName } =
+                    context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendKeyboard(
+                            staffConnectorName,
+                            staffUserId,
+                            staffChatId,
+                            `🔧 Обращение #${appealId} в работе у ${accepterEmployeeName ?? 'вас'}`,
+                            [
+                                { text: 'Закрыть обращение' },
+                                { text: 'Переназначить' },
+                                { text: 'Вернуть в очередь' },
+                            ],
+                        );
+                    } catch (err) {
+                        console.error('[support:notifyInProgress] Ошибка:', err);
+                    }
+                })();
+            },
+
             notifyTaken: ({ context }) => {
-                console.log(
-                    `📢 Обращение взято в работу сотрудником ${context.accepterEmployeeName}`,
-                );
+                const {
+                    userConnectorName,
+                    userUserId,
+                    userChatId,
+                    appealId,
+                    accepterEmployeeName,
+                } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendText(
+                            userConnectorName,
+                            userUserId,
+                            userChatId,
+                            `📢 Ваше обращение #${appealId} взято в работу специалистом ${accepterEmployeeName ?? ''}.`,
+                        );
+                    } catch (err) {
+                        console.error('[support:notifyTaken] Ошибка:', err);
+                    }
+                })();
             },
 
             notifyReassigned: ({ context }) => {
-                console.log(
-                    `🔄 Ответственный изменен на ${context.accepterEmployeeName}`,
-                );
+                const {
+                    userConnectorName,
+                    userUserId,
+                    userChatId,
+                    appealId,
+                    accepterEmployeeName,
+                } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendText(
+                            userConnectorName,
+                            userUserId,
+                            userChatId,
+                            `🔄 Ваше обращение #${appealId} переназначено специалисту ${accepterEmployeeName ?? ''}.`,
+                        );
+                    } catch (err) {
+                        console.error('[support:notifyReassigned] Ошибка:', err);
+                    }
+                })();
             },
 
-            notifyReleased: () => {
-                console.log(`🔓 Обращение возвращено в общую очередь`);
+            notifyReleased: ({ context }) => {
+                const { userConnectorName, userUserId, userChatId, appealId } =
+                    context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendText(
+                            userConnectorName,
+                            userUserId,
+                            userChatId,
+                            `🔓 Ваше обращение #${appealId} возвращено в очередь. Ожидайте назначения специалиста.`,
+                        );
+                    } catch (err) {
+                        console.error('[support:notifyReleased] Ошибка:', err);
+                    }
+                })();
             },
 
-            promptSolution: () => {
-                console.log(`✍️ Ожидание ввода решения от сотрудника...`);
+            promptSolution: ({ context }) => {
+                const { staffConnectorName, staffUserId, staffChatId, appealId } =
+                    context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendKeyboard(
+                            staffConnectorName,
+                            staffUserId,
+                            staffChatId,
+                            `✍️ Введите текст решения для обращения #${appealId}:`,
+                            [{ text: 'Отмена' }],
+                        );
+                    } catch (err) {
+                        console.error('[support:promptSolution] Ошибка:', err);
+                    }
+                })();
             },
 
             notifySolved: ({ context }) => {
-                console.log(
-                    `✅ Решение зафиксировано: "${context.solutionText}"`,
-                );
-                console.log(`🏁 Обращение закрыто.`);
+                const {
+                    userConnectorName,
+                    userUserId,
+                    userChatId,
+                    staffConnectorName,
+                    staffUserId,
+                    staffChatId,
+                    appealId,
+                    solutionText,
+                } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendText(
+                            userConnectorName,
+                            userUserId,
+                            userChatId,
+                            `✅ Ваше обращение #${appealId} закрыто.\n\nРешение: ${solutionText}`,
+                        );
+                        await messagingService.sendText(
+                            staffConnectorName,
+                            staffUserId,
+                            staffChatId,
+                            `🏁 Обращение #${appealId} успешно закрыто.`,
+                        );
+                    } catch (err) {
+                        console.error('[support:notifySolved] Ошибка:', err);
+                    }
+                })();
             },
 
-            notifySolutionCancelled: () => {
-                console.log(
-                    `❌ Ввод решения отменен. Возврат к статусу В работе.`,
-                );
+            notifySolutionCancelled: ({ context }) => {
+                const { staffConnectorName, staffUserId, staffChatId } = context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendText(
+                            staffConnectorName,
+                            staffUserId,
+                            staffChatId,
+                            '❌ Ввод решения отменён. Обращение остаётся в работе.',
+                        );
+                    } catch (err) {
+                        console.error('[support:notifySolutionCancelled] Ошибка:', err);
+                    }
+                })();
+            },
+
+            notifyClosed: ({ context }) => {
+                console.log(`[Обращение ${context.appealId}] Статус: Закрыто`);
             },
 
             sendReminder: ({ context }) => {
-                console.log(
-                    `⏰ Напоминание: Обращение ${context.appealId} ожидает распределения!`,
-                );
+                const { staffConnectorName, staffUserId, staffChatId, appealId } =
+                    context;
+                (async () => {
+                    try {
+                        const { default: messagingService } = await import(
+                            '../services/messaging-service.js'
+                        );
+                        await messagingService.sendText(
+                            staffConnectorName,
+                            staffUserId,
+                            staffChatId,
+                            `⏰ Напоминание: обращение #${appealId} всё ещё ожидает распределения!`,
+                        );
+                    } catch (err) {
+                        console.error('[support:sendReminder] Ошибка:', err);
+                    }
+                })();
             },
         },
     },
