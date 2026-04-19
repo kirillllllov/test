@@ -114,3 +114,29 @@ export async function deleteAppeal(appealId: string): Promise<void> {
         deletedAt: new Date().toISOString(),
     });
 }
+
+/**
+ * Изменить статус обращения.
+ * Выполняет валидацию: обращение и новый статус должны существовать.
+ * Бизнес-правила (например, запрет смены статуса закрытого обращения) —
+ * на уровне сервиса в appeal-actions.ts.
+ */
+export async function changeAppealStatus(
+    appealId: string,
+    newStatusId: string,
+): Promise<void> {
+    const [appeal, statusExists] = await Promise.all([
+        getItem<Appeal>(TABLE_NAMES.APPEALS, appealId),
+        validateFKExists(TABLE_NAMES.APPEAL_STATUSES, newStatusId),
+    ]);
+    if (!appeal) {
+        throw new Error(`Обращение ${appealId} не найдено`);
+    }
+    if (!statusExists) {
+        throw new Error(`Статус ${newStatusId} не существует`);
+    }
+    await updateItem(TABLE_NAMES.APPEALS, appealId, METADATA_SK, {
+        appealStatusId: newStatusId,
+        updatedAt: new Date().toISOString(),
+    });
+}

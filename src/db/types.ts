@@ -157,6 +157,18 @@ export interface UserState {
     updatedAt: string;
 }
 
+export interface SupportAppealState {
+    id: string; // PK: SUPPORT_STATE#<appealId>
+    sk: string; // SK: METADATA
+    appealId: string; // APPEAL#<cuid>
+    snapshot: any; // XState persisted snapshot (JSON)
+    context: Record<string, any>; // Machine context for quick access
+    currentState: string; // Current state name
+    machineType: string; // Type of machine ('supportAppeal', etc.)
+    createdAt: string;
+    updatedAt: string;
+}
+
 // ============================================================================
 // Table Names
 // ============================================================================
@@ -211,10 +223,24 @@ export const ID_PREFIXES = {
     CHATTYPE: 'CHATTYPE',
     IMAGE: 'IMAGE',
     USER_STATE: 'USER_STATE',
+    SUPPORT_STATE: 'SUPPORT_STATE',
     SUPPORT_STAFF: 'STAFF',
 } as const;
 
 export const METADATA_SK = 'METADATA';
+
+// ============================================================================
+// Appeal Status Names (из словаря статусов документации)
+// ============================================================================
+export const APPEAL_STATUS_NAMES = {
+    CREATED: 'Created',
+    VIEWED: 'Viewed',
+    IN_PROGRESS: 'In_progress',
+    WAITING_FOR_EXTERNAL: 'Waiting_for_external',
+    DECIDED: 'Decided',
+    CLOSED: 'Closed',
+} as const;
+export type AppealStatusName = typeof APPEAL_STATUS_NAMES[keyof typeof APPEAL_STATUS_NAMES];
 
 // ============================================================================
 // Helper Functions
@@ -289,6 +315,14 @@ export interface AppealImageCreateInput {
 
 export interface UserStateCreateInput {
     userId: string;
+    snapshot: any; // XState snapshot
+    context?: Record<string, any>;
+    currentState: string;
+    machineType: string;
+}
+
+export interface SupportAppealStateCreateInput {
+    appealId: string;
     snapshot: any; // XState snapshot
     context?: Record<string, any>;
     currentState: string;

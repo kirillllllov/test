@@ -1,4 +1,5 @@
-import counterService from './services/counter-service.js';
+
+import counterService from '../services/counter-service.js';
 
 async function testDynamoDb() {
     console.log('🧪 Testing DynamoDB connection with DynamoDB Toolbox...');
